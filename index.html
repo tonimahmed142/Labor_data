@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>লেবার ম্যানেজমেন্ট (Online)</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+  body { font-family: "Noto Sans Bengali", Arial, sans-serif; background:#f4f4f4; color:#222 }
+  header { background:#0077cc;color:#fff;padding:14px;text-align:center;font-weight:600 }
+  .app { max-width:1100px;margin:18px auto;padding:16px;background:#fff;border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,0.08) }
+  .hidden { display:none }
+  table{width:100%;border-collapse:collapse}
+  tr { transition: 0.3s; cursor:pointer; }
+  tr:hover { background:red; }
+  tr.clicked { background:red; color:white }
+  .red-dot { width:8px; height:8px; display:inline-block; background:red; border-radius:50%; margin-right:5px }
+  th,td{padding:8px;border:1px solid #eaeaea;text-align:center}
+  th { background:#0077cc; color:#fff }
+  .red{ background:#ffdddd }
+  .tab-btn { margin-right:6px }
+  input,select,textarea{ padding:6px;border:1px solid #ddd;border-radius:5px }
+  .small{font-size:13px;color:#555}
+</style>
+</head>
+
+<body>
+<header>লেবার কাজ ও বিল — Online Version</header>
+
+<!-- LOGIN -->
+<div class="app" id="loginPage">
+  <h4>লগইন</h4>
+  <button class="btn btn-primary" onclick="adminLogin()">Admin Login</button>
+</div>
+
+<!-- PASSWORD -->
+<div class="app hidden" id="passwordBox">
+  <h5>অ্যাডমিন পাসওয়ার্ড দিন</h5>
+  <div class="d-flex" style="gap:8px">
+    <input id="adminPass" type="password" class="form-control" placeholder="Password">
+    <button class="btn btn-primary" onclick="checkPassword()">Submit</button>
+    <button class="btn btn-secondary" onclick="backToLogin()">Back</button>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="app hidden" id="dashboard">
+
+  <div class="d-flex align-items-center mb-2">
+    <button class="btn btn-sm btn-outline-secondary tab-btn" id="dailyTabBtn" onclick="showTab('daily')">Daily Work</button>
+    <button class="btn btn-sm btn-outline-secondary tab-btn" id="permTabBtn" onclick="showTab('perm')">Permanent Workers</button>
+
+    <div style="flex:1"></div>
+
+    <input id="globalSearch" class="form-control"
+           placeholder="Search by name, date or description"
+           style="max-width:360px" oninput="renderDailyTable()">
+  </div>
+
+  <!-- DAILY WORK -->
+  <div id="dailySection">
+    <h5>দৈনিক কাজ</h5>
+
+    <div id="adminControls" class="mb-2 hidden">
+      <div class="d-flex flex-wrap" style="gap:8px">
+        <input id="nameInput" list="namesList" class="form-control" placeholder="নাম">
+        <datalist id="namesList"></datalist>
+
+        <input id="dateInput" type="date" class="form-control">
+        <input id="detailsInput" class="form-control" placeholder="বিবরণ">
+
+        <input id="bakiInput" type="number" class="form-control" placeholder="বাকী" oninput="recalcTotalAdd()">
+        <input id="jamaInput" type="number" class="form-control" placeholder="জমা" oninput="recalcTotalAdd()">
+        <input id="totalInput" type="number" class="form-control" placeholder="মোট">
+
+        <select id="sectionInput" class="form-control">
+          <option value="daily">Daily</option>
+          <option value="permanent">Permanent</option>
+        </select>
+
+        <button class="btn btn-primary" onclick="addRecord()">Add</button>
+      </div>
+    </div>
+
+    <table id="dailyTable" class="table table-sm">
+      <thead>
+        <tr>
+          <th>নাম</th> <th>তারিখ</th> <th>বিবরণ</th>
+          <th>বাকী</th> <th>জমা</th> <th>মোট</th>
+          <th class="admin-only hidden">Action</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- PERMANENT WORKERS -->
+  <div id="permSection" class="hidden mt-3">
+    <h5>স্থায়ী শ্রমিক</h5>
+
+    <table id="workerTable" class="table table-sm">
+      <thead>
+        <tr>
+          <th>নাম</th>
+          <th>মোট বাকী</th>
+          <th>মোট জমা</th>
+          <th>ব্যালান্স</th>
+          <th>মোট কাজ</th>
+          <th>শেষ?</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- WORKER DETAILS -->
+<div class="app hidden" id="workerDetails">
+  <h5 id="workerTitle"></h5>
+
+  <table class="table table-sm">
+    <thead><tr>
+      <th>তারিখ</th>
+      <th>বিবরণ</th>
+      <th>বাকী</th>
+      <th>জমা</th>
+      <th>মোট</th>
+      <th>রানিং</th>
+      <th>Edit</th>
+    </tr></thead>
+    <tbody id="workerDetailBody"></tbody>
+  </table>
+
+  <button class="btn btn-secondary" onclick="closeWorkerDetails()">Back</button>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal fade" id="editModal">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header">
+      <h5>রেকর্ড সম্পাদনা</h5>
+      <button class="close" onclick="closeEditModal()">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <input type="hidden" id="editId">
+
+      <label>নাম</label>
+      <input id="editName" class="form-control">
+
+      <label>তারিখ</label>
+      <input id="editDate" type="date" class="form-control">
+
+      <label>বিবরণ</label>
+      <input id="editDetails" class="form-control">
+
+      <div class="d-flex" style="gap:8px;margin-top:8px">
+        <input id="editBaki" type="number" class="form-control" placeholder="বাকী" oninput="recalcTotalEdit()">
+        <input id="editJama" type="number" class="form-control" placeholder="জমা" oninput="recalcTotalEdit()">
+        <input id="editTotal" type="number" class="form-control" placeholder="মোট">
+      </div>
+
+      <label style="margin-top:8px">সেকশন</label>
+      <select id="editSection" class="form-control">
+        <option value="daily">Daily</option>
+        <option value="permanent">Permanent</option>
+      </select>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEdit()">Save</button>
+    </div>
+  </div></div>
+</div>
+
+<!-- JS LIBRARIES -->
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+/* ==============================
+   ONLINE API
+   ============================== */
+const API = "https://labor-data.onrender.com";
+
+let records = [];
+let finishedStatus = {};
+let mode = "";
+
+/* ---------- LOGIN ---------- */
+function adminLogin() {
+  loginPage.classList.add("hidden");
+  passwordBox.classList.remove("hidden");
+}
+
+function checkPassword() {
+  if (adminPass.value === "2005") openDashboard("admin");
+  else alert("Wrong password");
+}
+
+function openDashboard(t) {
+  mode = t;
+
+  loginPage.classList.add("hidden");
+  passwordBox.classList.add("hidden");
+  dashboard.classList.remove("hidden");
+
+  if (mode === "admin") {
+    adminControls.classList.remove("hidden");
+    document.querySelectorAll(".admin-only").forEach(e=>e.classList.remove("hidden"));
+  }
+
+  loadFromServer();
+}
+
+function backToLogin() {
+  passwordBox.classList.add("hidden");
+  loginPage.classList.remove("hidden");
+}
+
+/* ---------- LOAD FROM SERVER ---------- */
+async function loadFromServer() {
+  const res = await fetch(API + "/records");
+  const data = await res.json();
+
+  records = data.records || [];
+  finishedStatus = data.finishedStatus || {};
+
+  updateNamesDatalist();
+  renderDailyTable();
+  renderWorkerTable();
+}
+
+/* ---------- ADD RECORD ---------- */
+async function addRecord() {
+  const id = Date.now().toString(36);
+
+  const rec = {
+    id,
+    name: nameInput.value,
+    date: dateInput.value,
+    description: detailsInput.value,
+    baki: parseFloat(bakiInput.value) || 0,
+    jama: parseFloat(jamaInput.value) || 0,
+    total: parseFloat(totalInput.value) || 0,
+    section: sectionInput.value
+  };
+
+  await fetch(API + "/records", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(rec)
+  });
+
+  loadFromServer();
+}
+
+/* ---------- EDIT RECORD ---------- */
+function openEditModal(id) {
+  const r = records.find(x=>x.id===id);
+  if (!r) return alert("Record not found");
+
+  editId.value = r.id;
+  editName.value = r.name;
+  editDate.value = r.date;
+  editDetails.value = r.description;
+  editBaki.value = r.baki;
+  editJama.value = r.jama;
+  editTotal.value = r.total;
+  editSection.value = r.section;
+
+  $("#editModal").modal("show");
+}
+
+function closeEditModal() { $("#editModal").modal("hide"); }
+
+async function saveEdit() {
+  const id = editId.value;
+
+  const updated = {
+    id,
+    name: editName.value,
+    date: editDate.value,
+    description: editDetails.value,
+    baki: parseFloat(editBaki.value)||0,
+    jama: parseFloat(editJama.value)||0,
+    total: parseFloat(editTotal.value)||0,
+    section: editSection.value
+  };
+
+  await fetch(API + "/records/" + id, {
+    method:"PUT",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(updated)
+  });
+
+  closeEditModal();
+  loadFromServer();
+}
+
+/* ---------- DELETE ---------- */
+async function deleteRecord(id) {
+  if (!confirm("Delete record?")) return;
+
+  await fetch(API + "/records/" + id, {
+    method:"DELETE"
+  });
+
+  loadFromServer();
+}
+
+/* ---------- WORKERS ---------- */
+
+function showTab(tab) {
+  if (tab === "daily") {
+    dailySection.classList.remove("hidden");
+    permSection.classList.add("hidden");
+  } else {
+    dailySection.classList.add("hidden");
+    permSection.classList.remove("hidden");
+    renderWorkerTable();
+  }
+}
+
+function renderDailyTable() {
+  const q = globalSearch.value.toLowerCase();
+  const tbody = dailyTable.querySelector("tbody");
+  tbody.innerHTML = "";
+
+  records
+    .filter(r => r.section === "daily")
+    .filter(r =>
+      r.name.toLowerCase().includes(q) ||
+      r.date.includes(q) ||
+      r.description.toLowerCase().includes(q)
+    )
+    .sort((a,b) => new Date(b.date)-new Date(a.date))
+    .forEach(r => {
+      const tr = document.createElement("tr");
+
+      if (r.description.toLowerCase().includes("payment") || r.jama > 0)
+        tr.classList.add("red");
+
+      tr.innerHTML = `
+        <td>${r.name}</td>
+        <td>${r.date}</td>
+        <td>${r.description}</td>
+        <td>${r.baki}</td>
+        <td>${r.jama}</td>
+        <td>${r.total}</td>
+        <td class="admin-only">
+          <button class="btn btn-sm btn-outline-primary" onclick="openEditModal('${r.id}')">Edit</button>
+          <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord('${r.id}')">Delete</button>
+        </td>
+      `;
+
+      tbody.appendChild(tr);
+    });
+}
+
+function renderWorkerTable() {
+  const tbody = workerTable.querySelector("tbody");
+  tbody.innerHTML = "";
+
+  const summary = {};
+
+  records.forEach(r => {
+    if (!summary[r.name]) summary[r.name] = {baki:0,jama:0,count:0};
+    summary[r.name].baki += r.baki;
+    summary[r.name].jama += r.jama;
+    summary[r.name].count++;
+  });
+
+  Object.keys(summary).forEach(name => {
+    const s = summary[name];
+    const finished = finishedStatus[name] || false;
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><a onclick="showWorkerDetails('${name}')">${finished?"":'<span class="red-dot"></span>'}${name}</a></td>
+      <td>${s.baki}</td>
+      <td>${s.jama}</td>
+      <td>${s.baki - s.jama}</td>
+      <td>${s.count}</td>
+      <td><input type="checkbox" ${finished?"checked":""} onchange="toggleFinished('${name}', this.checked')"></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function toggleFinished(name, checked) {
+  finishedStatus[name] = checked;
+
+  await fetch(API + "/finished", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(finishedStatus)
+  });
+
+  renderWorkerTable();
+}
+
+/* ---------- NAME DATALIST ---------- */
+function updateNamesDatalist() {
+  const list = namesList;
+  list.innerHTML = "";
+
+  [...new Set(records.map(r=>r.name))].forEach(n => {
+    const o = document.createElement("option");
+    o.value = n;
+    list.appendChild(o);
+  });
+}
+
+/* ---------- UTIL ---------- */
+
+function recalcTotalAdd() {
+  totalInput.value =
+    (parseFloat(bakiInput.value) || 0) +
+    (parseFloat(jamaInput.value) || 0);
+}
+
+function recalcTotalEdit() {
+  editTotal.value =
+    (parseFloat(editBaki.value) || 0) +
+    (parseFloat(editJama.value) || 0);
+}
+</script>
+
+</body>
+</html>
