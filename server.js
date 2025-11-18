@@ -1,35 +1,35 @@
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
+
 const app = express();
 
 // Middleware
 app.use(express.json());
 app.use(cors());
 
-// Temporary memory DB (can be replaced by MongoDB/PostgreSQL later)
+// Serve frontend (index.html, CSS, JS)
+app.use(express.static(path.join(__dirname)));
+
+// Memory DB (temporary)
 let records = [];
 let finishedStatus = {};
 
-// Test route
-app.get("/", (req, res) => {
-  res.send("Labor Management API Online ✔");
-});
-
-// Fetch all data
+// API: Get everything
 app.get("/records", (req, res) => {
   res.json({ records, finishedStatus });
 });
 
-// Add record
+// API: Add record
 app.post("/records", (req, res) => {
   records.push(req.body);
   res.json({ success: true });
 });
 
-// Update record
+// API: Update record
 app.put("/records/:id", (req, res) => {
   const { id } = req.params;
-  const index = records.findIndex((r) => r.id === id);
+  const index = records.findIndex(r => r.id === id);
   if (index !== -1) {
     records[index] = req.body;
     res.json({ success: true });
@@ -38,17 +38,21 @@ app.put("/records/:id", (req, res) => {
   }
 });
 
-// Delete record
+// API: Delete record
 app.delete("/records/:id", (req, res) => {
-  const { id } = req.params;
-  records = records.filter((r) => r.id !== id);
+  records = records.filter(r => r.id !== id);
   res.json({ success: true });
 });
 
-// Update worker finish state
+// API: Update finished status
 app.post("/finished", (req, res) => {
   finishedStatus = req.body;
   res.json({ success: true });
+});
+
+// Fallback → If no API route matched, send index.html
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
 });
 
 const PORT = process.env.PORT || 5000;
